@@ -1,0 +1,40 @@
+services:
+  db:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    image: blogapi-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:?set POSTGRES_USER in .env}
+      - POSTGRES_DB=${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: blogapi-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+        PORT: 8080
+        DATABASE_URL: host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable
+        JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env} 
+    ports:
+      - "80:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q0- http://127.0.0.1:8080/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+volumes:
+  pgdata:
+  
